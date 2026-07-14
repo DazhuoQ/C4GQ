@@ -38,8 +38,6 @@ The configured datasets are `ilpg`, `wwc2019`, `stackoverflow`, `fincen`,
 | `Pattern_utils.py` | Builds sparse relationship-to-match and relationship-to-intervention incidence maps. |
 | `requirements.txt` | Python dependencies. |
 | `.env.example` | Example Neo4j environment variables without credentials. |
-| `docs/EXPERIMENT_HISTORY.md` | Design history and shared P-RSP/P-RES workflow. |
-| `docs/GITHUB_PUBLISHING.md` | First-push, authentication, update, and release instructions. |
 
 Neo4j databases and raw datasets are intentionally not included. They are
 usually too large for Git and may have separate redistribution terms.
