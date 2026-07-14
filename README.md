@@ -1,14 +1,17 @@
-# P-RSP multi-dataset experiments
+# P-RSP and P-RES multi-dataset experiments
 
 This repository runs approximation and baseline algorithms for pattern-based
-query responsibility (P-RSP) over isolated Neo4j datasets. It includes:
+query responsibility (P-RSP) and pattern-based query resilience (P-RES) over
+isolated Neo4j datasets. It includes:
 
 - survivor-conditioned LP rounding;
 - LP-guided greedy and random baselines;
 - direct greedy and random baselines that do not solve an LP;
 - dataset-specific preflight query selection;
 - reproducible multi-seed experiment orchestration, timeouts, aggregation, and
-  reuse of previously resolved preflights.
+  reuse of previously resolved preflights;
+- a shared-query P-RES workflow that consumes the exact Cypher query and
+  intervention pattern selected for P-RSP.
 
 The final experiment grid contains six datasets and four scales:
 
@@ -28,18 +31,20 @@ The configured datasets are `ilpg`, `wwc2019`, `stackoverflow`, `fincen`,
 | --- | --- |
 | `RSP-RD.py` | Implements all five algorithms and the single-run CLI. |
 | `run_all_rsp_experiments.py` | Resolves preflights, runs the experiment grid, enforces timeouts, and aggregates results. |
-| `experiment_settings.json` | Defines settings, datasets, Cypher candidates, and screening thresholds. |
+| `RES-RD.py` | Implements P-RES rounding, LP-guided greedy, and LP-guided random. |
+| `run_all_pres_experiments.py` | Runs P-RES using saved P-RSP query/intervention artifacts. |
+| `experiment_settings.json` | Defines settings, datasets, candidates, and RSP preflight screening thresholds. |
 | `utils.py` | Connects to and switches among isolated local Neo4j instances. |
 | `Pattern_utils.py` | Builds sparse relationship-to-match and relationship-to-intervention incidence maps. |
 | `requirements.txt` | Python dependencies. |
 | `.env.example` | Example Neo4j environment variables without credentials. |
-| `docs/EXPERIMENT_HISTORY.md` | Design history, rationale, and the trends observed during development. |
+| `docs/EXPERIMENT_HISTORY.md` | Design history and shared P-RSP/P-RES workflow. |
 | `docs/GITHUB_PUBLISHING.md` | First-push, authentication, update, and release instructions. |
 
 Neo4j databases and raw datasets are intentionally not included. They are
 usually too large for Git and may have separate redistribution terms.
 
-## Algorithms
+## P-RSP algorithms
 
 | CLI name | LP? | Selection rule | Feasibility behavior |
 | --- | --- | --- | --- |
@@ -57,6 +62,18 @@ valid solution.
 
 For contingency size `k`, the reported responsibility is `1 / (1 + k)`.
 Smaller contingency sets therefore mean higher responsibility.
+
+## P-RES algorithms
+
+P-RES uses the same query matches and intervention units, but it has no
+distinguished responsibility target. Its objective is the minimum number of
+intervention units whose relationships hit every query match.
+
+| CLI name | Selection rule |
+| --- | --- |
+| `rounding` | LP randomized rounding, coverage-aware repair, and reverse deletion. |
+| `greedy` | Greedy coverage over positive LP support, followed by repair. |
+| `random` | Random sampling over positive LP support, followed by repair. |
 
 ## Prerequisites
 
@@ -84,20 +101,20 @@ All instances normally share `bolt://localhost:7687`, so only one managed
 instance should run at a time. Directory names must match the names above (the
 utility also recognizes a few aliases such as `icij`, `wwc`, and `starwars`).
 
-The generated runtime/quality candidates expect these relationship pools:
+The generated runtime/quality candidates use these relationship pools:
 
 | Dataset | Required relationship pattern |
 | --- | --- |
 | ILPG | `(:Article)-[:CITATION]->(:Article)` |
 | WWC 2019 | `(:Person)-[:PLAYED_IN]->(:Match)` |
-| Stack Overflow | `()-[:ANSWERED]->()` |
-| FinCEN | `()-[:ORIGINATOR]->()` |
-| ICIJ Offshore Leaks | `()-[:officer_of]->()` |
-| Star Wars | `()-[:APPEARED_IN]->()` |
+| Stack Overflow | `(:Answer)-[:ANSWERED]->(:Question)` |
+| FinCEN | `(:Filing)-[:ORIGINATOR]->(:Entity)` |
+| ICIJ Offshore Leaks | `(:Officer)-[:officer_of]-()` |
+| Star Wars | `(:Character)-[:APPEARED_IN]->(:Film)` |
 
-Other candidate queries in `experiment_settings.json` may require additional
-dataset-specific labels and relationship types. Validate your imported schemas
-before treating results as comparable.
+Other configured candidates use additional dataset-specific labels and
+relationship types. Validate every imported schema before treating results as
+comparable.
 
 ## Installation
 
@@ -196,7 +213,31 @@ full run without `--reuse-preflight-from` recomputes preflights.
 Do not combine `--reset-output` with an output directory that is also being
 used as a preflight source.
 
-### 4. Resume an interrupted run
+### 4. Run P-RES with the same query and intervention artifacts
+
+P-RES does not perform another preflight. Point it at the same RSP preflight
+roots, and it loads each saved `query.cypher`, `pattern.cypher`, and
+`metadata.json`:
+
+```bash
+python run_all_pres_experiments.py \
+  --config experiment_settings.json \
+  --algorithm-script RES-RD.py \
+  --resolved-query-root rsp_preflight_small \
+  --resolved-query-root rsp_preflight_large \
+  --algorithms rounding,greedy,random \
+  --seeds 1,2,3,4,5 \
+  --timeout-minutes 30 \
+  --output-root pres_complete_results
+```
+
+With an unchanged Neo4j snapshot, this makes P-RSP and P-RES execute identical
+finite query records and intervention-unit definitions for each
+dataset/setting. The RSP target stored in metadata is intentionally ignored by
+P-RES because resilience eliminates all query matches rather than preserving a
+target-overlapping survivor.
+
+### 5. Resume an interrupted run
 
 Run the same command and the runner skips completed rollouts. Add `--rerun` only
 when you intentionally want to repeat completed cells. `--reset-output`
@@ -238,7 +279,7 @@ Each output root contains:
 
 | Path | Meaning |
 | --- | --- |
-| `preflight.csv` / `preflight.jsonl` | Every screened candidate and its status/diagnostics. |
+| `preflight.csv` / `preflight.jsonl` | Every screened RSP candidate and its diagnostics. |
 | `resolved_queries/<dataset>/<setting>/` | The selected query, pattern, target metadata, and counts. |
 | `results.jsonl` | Append-only record for individual rollouts. |
 | `summary.csv` | Per-rollout normalized metrics. |
@@ -250,23 +291,24 @@ The most important analysis columns are dataset, setting, algorithm,
 contingency size, responsibility, algorithm time, total time, status, and seed.
 Always check `status` and timeouts before comparing means.
 
+The P-RES output root has the same `results.jsonl`, `summary.csv`,
+`aggregate_results.csv`, `timeouts.csv`, and `rollouts/` structure. Its copied
+`resolved_queries/` directory records exactly which RSP artifacts were shared.
+
 ## Preflight selection and scientific reporting
 
-Preflight is not merely a syntax check. It searches candidate query/pattern
-pairs for exact capacity, RSP feasibility, bounded survivor count, LP support,
-quality ratios, random-vs-rounding separation, and a runtime-work proxy. The
-current policy intentionally seeks cases where:
+RSP preflight searches candidate query/pattern pairs for capacity, RSP
+feasibility, bounded survivor count, LP support, quality ratios,
+random-versus-rounding separation, and a runtime-work proxy. Its configured
+policy intentionally seeks instances where rounding and greedy have comparable
+contingency sizes, greedy performs more selection work, and random baselines
+return larger feasible contingencies.
 
-- rounding and greedy have comparable contingency sizes;
-- LP-guided greedy performs substantially more selection work;
-- random baselines produce larger feasible contingencies;
-- all methods operate on the same target and finite query instance.
-
-Because this is outcome-aware screening, publications should disclose the
-selection thresholds in `experiment_settings.json` and label these results as
-screened benchmark instances. To support claims of general superiority, also
-report an unscreened or held-out query suite. Do not silently present selected
-instances as random samples of all possible queries.
+This is outcome-aware benchmark construction. Publications must disclose the
+selection thresholds in `experiment_settings.json` and label the resulting
+cells as screened instances rather than unbiased samples. Broader superiority
+claims require an unscreened or held-out query suite. P-RES reuses the selected
+instances for paired comparison; it does not make their selection neutral.
 
 ## Parallel execution
 

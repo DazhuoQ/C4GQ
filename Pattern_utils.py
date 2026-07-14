@@ -1,4 +1,4 @@
-"""Build sparse relationship incidence maps for P-RSP algorithms."""
+"""Build sparse relationship incidence maps for P-RSP and P-RES."""
 
 from __future__ import annotations
 
@@ -66,3 +66,26 @@ def element_match_mapping(
             patterns_of_edge[relationship.element_id]
 
     return pattern_unit_edges, match_edges, dict(patterns_of_edge)
+
+
+def match_hitting_set(
+    match_edges: Mapping[int, Iterable[str]],
+    pattern_unit_edges: Mapping[int, Iterable[str]],
+) -> dict[int, set[int]]:
+    """Map each query match to intervention units sharing a relationship.
+
+    A P-RES intervention unit destroys a query match exactly when their
+    relationship sets overlap. Empty sets therefore identify infeasible query
+    matches for the supplied intervention pattern.
+    """
+    units_of_edge: defaultdict[str, set[int]] = defaultdict(set)
+    for unit, edge_ids in pattern_unit_edges.items():
+        for edge_id in edge_ids:
+            units_of_edge[edge_id].add(unit)
+
+    return {
+        match: set().union(
+            *(units_of_edge.get(edge_id, set()) for edge_id in edge_ids)
+        )
+        for match, edge_ids in match_edges.items()
+    }

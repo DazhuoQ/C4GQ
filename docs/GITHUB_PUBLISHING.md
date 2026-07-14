@@ -12,10 +12,12 @@ Commit these files:
 .gitignore
 README.md
 RSP-RD.py
+RES-RD.py
 Pattern_utils.py
 experiment_settings.json
 requirements.txt
 run_all_rsp_experiments.py
+run_all_pres_experiments.py
 utils.py
 docs/
 ```
@@ -41,8 +43,10 @@ cd rsp-rd-experiments
 
 python -m py_compile \
   RSP-RD.py \
+  RES-RD.py \
   Pattern_utils.py \
   run_all_rsp_experiments.py \
+  run_all_pres_experiments.py \
   utils.py
 python -m json.tool experiment_settings.json >/dev/null
 
@@ -106,7 +110,8 @@ and documentation are ready.
 
 ```bash
 git status
-git add README.md RSP-RD.py run_all_rsp_experiments.py \
+git add README.md RSP-RD.py RES-RD.py run_all_rsp_experiments.py \
+  run_all_pres_experiments.py \
   experiment_settings.json utils.py Pattern_utils.py docs
 git diff --cached
 git commit -m "Describe the change"

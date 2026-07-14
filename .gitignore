@@ -16,7 +16,9 @@ venv/
 # Experiment outputs (can be large and contain local Neo4j element IDs)
 rsp_*results*/
 rsp_*preflight*/
+pres_*results*/
 rsp_experiment_results/
+pres_experiment_results/
 run_logs/
 resolved_queries/
 algorithm_logs/
