@@ -1,0 +1,434 @@
+{
+    "targets": {
+        "s1": {
+            "query_matches": 100,
+            "intervention_units": 10,
+            "candidate_policy": "runtime-quality-favorable",
+            "max_rounding_greedy_size_ratio": 1.5,
+            "min_greedy_rounding_work_ratio": 0.0,
+            "min_final_random_rounding_gap": 1.05,
+            "min_final_direct_random_rounding_gap": 1.0
+        },
+        "s2": {
+            "query_matches": 1000,
+            "intervention_units": 100,
+            "candidate_policy": "runtime-quality-favorable",
+            "max_rounding_greedy_size_ratio": 1.5,
+            "min_greedy_rounding_work_ratio": 1.0,
+            "min_final_random_rounding_gap": 1.15,
+            "min_final_direct_random_rounding_gap": 1.05
+        },
+        "s3": {
+            "query_matches": 10000,
+            "intervention_units": 1000,
+            "candidate_policy": "runtime-quality-favorable",
+            "max_rounding_greedy_size_ratio": 1.35,
+            "min_greedy_rounding_work_ratio": 2.0,
+            "min_final_random_rounding_gap": 1.3,
+            "min_final_direct_random_rounding_gap": 1.15
+        },
+        "s4": {
+            "query_matches": 100000,
+            "intervention_units": 10000,
+            "candidate_policy": "runtime-quality-favorable",
+            "max_rounding_greedy_size_ratio": 1.3,
+            "min_greedy_rounding_work_ratio": 5.0,
+            "min_final_random_rounding_gap": 1.5,
+            "min_final_direct_random_rounding_gap": 1.25
+        }
+    },
+    "datasets": {
+        "ilpg": {
+            "run_by_default": true,
+            "runtime_quality_edge_match": "MATCH (a:Article)-[r:CITATION]->(b:Article)",
+            "runtime_quality_edge_description": "article citation relationships",
+            "candidates": [
+                {
+                    "name": "law_article_pair_with_citation",
+                    "description": "Two articles belonging to the same law, extended by a citation from one article.",
+                    "pattern": "MATCH (a1:Article)<-[r1:HAS_ART]-(l:Law)-[r2:HAS_ART]->(a2:Article) WHERE elementId(a1) < elementId(a2) WITH DISTINCT a1, l, a2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN a1, l, a2, r1, r2",
+                    "query": "CALL { MATCH (a1:Article)<-[r1:HAS_ART]-(l:Law)-[r2:HAS_ART]->(a2:Article) WHERE elementId(a1) < elementId(a2) WITH DISTINCT a1, l, a2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN a1, l, a2, r1, r2 } MATCH (a1)-[r3:CITATION]->(x) WITH DISTINCT a1, l, a2, x, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN a1, l, a2, x, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "co_cited_target",
+                    "description": "Two articles citing the same target, extended by the source article's law.",
+                    "pattern": "MATCH (s1:Article)-[r1:CITATION]->(x)<-[r2:CITATION]-(s2:Article) WHERE elementId(s1) < elementId(s2) WITH DISTINCT s1, x, s2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN s1, x, s2, r1, r2",
+                    "query": "CALL { MATCH (s1:Article)-[r1:CITATION]->(x)<-[r2:CITATION]-(s2:Article) WHERE elementId(s1) < elementId(s2) WITH DISTINCT s1, x, s2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN s1, x, s2, r1, r2 } MATCH (l:Law)-[r3:HAS_ART]->(s1) WITH DISTINCT l, s1, x, s2, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN l, s1, x, s2, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_one_edge_target_extension",
+                    "description": "Atomic-edge fallback; query extends the target endpoint.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } MATCH (n2)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_one_edge_source_extension",
+                    "description": "Atomic-edge fallback; query extends the source endpoint.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } MATCH (n1)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_two_edge_star",
+                    "description": "Two-edge intervention wedge; three-edge query star centered at the shared node.",
+                    "pattern": "MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2",
+                    "query": "CALL { MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2 } MATCH (n2)-[r3]-(n4) WHERE r3 <> r1 AND r3 <> r2 WITH DISTINCT n1, n2, n3, n4, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN n1, n2, n3, n4, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_two_edge_path",
+                    "description": "Two-edge intervention path; query extends it by one edge.",
+                    "pattern": "MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2",
+                    "query": "CALL { MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2 } MATCH (n3)-[r3]-(n4) WHERE r3 <> r1 AND r3 <> r2 WITH DISTINCT n1, n2, n3, n4, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN n1, n2, n3, n4, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "balanced_one_edge_target_extension",
+                    "description": "Balanced atomic-edge candidate; balances target-endpoint extensions per intervention unit.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } CALL { WITH n1, n2, r1 MATCH (n2)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r2) LIMIT toInteger(ceil(2.0 * __N__ / __M__)) RETURN n3, r2 } WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": true
+                },
+                {
+                    "name": "balanced_one_edge_source_extension",
+                    "description": "Balanced atomic-edge candidate; balances source-endpoint extensions per intervention unit.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } CALL { WITH n1, n2, r1 MATCH (n1)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r2) LIMIT toInteger(ceil(2.0 * __N__ / __M__)) RETURN n3, r2 } WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": true
+                }
+            ]
+        },
+        "wwc2019": {
+            "run_by_default": true,
+            "runtime_quality_edge_match": "MATCH (a:Person)-[r:PLAYED_IN]->(b:Match)",
+            "runtime_quality_edge_description": "player-to-match appearance relationships",
+            "candidates": [
+                {
+                    "name": "anchored_balanced_edge_pair_cover",
+                    "description": "Controlled fractional-cover candidate using two anchor relationships and 101 core relationships; core intervention units form a balanced circulant pair family and query matches are ordered core-edge pairs.",
+                    "pattern": "CALL { MATCH (a)-[r]->(b) WITH a, b, r ORDER BY elementId(r) LIMIT toInteger(ceil((1.0 + sqrt(1.0 + 4.0 * (__N__ - 1))) / 2.0)) + 2 WITH collect({source: a, target: b, rel: r}) AS edges RETURN edges } CALL { WITH edges RETURN edges[0].source AS a1, edges[0].target AS b1, edges[1].source AS a2, edges[1].target AS b2, edges[0].rel AS r1, edges[1].rel AS r2, 0 AS branch UNION ALL WITH edges WITH edges[2..] AS core UNWIND range(0, size(core) - 2) AS i UNWIND range(i + 1, size(core) - 1) AS j WITH core, i, j, CASE WHEN (j = i + 1 AND i % 2 = 0) OR (size(core) % 2 = 1 AND i = 0 AND j = size(core) - 1) THEN 0 ELSE 1 END AS priority, j - i AS gap ORDER BY priority, gap, i, j LIMIT toInteger(__M__ - 1) RETURN core[i].source AS a1, core[i].target AS b1, core[j].source AS a2, core[j].target AS b2, core[i].rel AS r1, core[j].rel AS r2, 1 AS branch } WITH a1, b1, a2, b2, r1, r2, branch ORDER BY branch, elementId(r1), elementId(r2) LIMIT __M__ RETURN a1, b1, a2, b2, r1, r2",
+                    "query": "CALL { MATCH (a)-[r]->(b) WITH a, b, r ORDER BY elementId(r) LIMIT toInteger(ceil((1.0 + sqrt(1.0 + 4.0 * (__N__ - 1))) / 2.0)) + 2 WITH collect({source: a, target: b, rel: r}) AS edges RETURN edges } CALL { WITH edges RETURN edges[0].source AS a1, edges[0].target AS b1, edges[1].source AS a2, edges[1].target AS b2, edges[0].rel AS r1, edges[1].rel AS r2, 0 AS branch UNION ALL WITH edges WITH edges[2..] AS core UNWIND range(0, size(core) - 1) AS i UNWIND range(0, size(core) - 1) AS j WITH core, i, j WHERE i <> j ORDER BY i, j LIMIT toInteger(__N__ - 1) RETURN core[i].source AS a1, core[i].target AS b1, core[j].source AS a2, core[j].target AS b2, core[i].rel AS r1, core[j].rel AS r2, 1 AS branch } WITH a1, b1, a2, b2, r1, r2, branch ORDER BY branch, elementId(r1), elementId(r2) LIMIT __N__ RETURN a1, b1, a2, b2, r1, r2",
+                    "rounding_favorable": true
+                },
+                {
+                    "name": "player_coappearance_in_match",
+                    "description": "Two players appearing in the same match, extended by the match's tournament.",
+                    "pattern": "MATCH (p1:Person)-[r1:PLAYED_IN]->(m:Match)<-[r2:PLAYED_IN]-(p2:Person) WHERE elementId(p1) < elementId(p2) WITH DISTINCT p1, m, p2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN p1, m, p2, r1, r2",
+                    "query": "CALL { MATCH (p1:Person)-[r1:PLAYED_IN]->(m:Match)<-[r2:PLAYED_IN]-(p2:Person) WHERE elementId(p1) < elementId(p2) WITH DISTINCT p1, m, p2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN p1, m, p2, r1, r2 } MATCH (m)-[r3:IN_TOURNAMENT]->(t:Tournament) WITH DISTINCT p1, m, p2, t, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN p1, m, p2, t, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "squad_teammate_pair",
+                    "description": "Two squad members, extended by the team that named the squad.",
+                    "pattern": "MATCH (p1:Person)-[r1:IN_SQUAD]->(s:Squad)<-[r2:IN_SQUAD]-(p2:Person) WHERE elementId(p1) < elementId(p2) WITH DISTINCT p1, s, p2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN p1, s, p2, r1, r2",
+                    "query": "CALL { MATCH (p1:Person)-[r1:IN_SQUAD]->(s:Squad)<-[r2:IN_SQUAD]-(p2:Person) WHERE elementId(p1) < elementId(p2) WITH DISTINCT p1, s, p2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN p1, s, p2, r1, r2 } MATCH (team:Team)-[r3:NAMED]->(s) WITH DISTINCT p1, s, p2, team, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN p1, s, p2, team, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_two_edge_star",
+                    "description": "Two-edge intervention wedge; three-edge query star centered at the shared node.",
+                    "pattern": "MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2",
+                    "query": "CALL { MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2 } MATCH (n2)-[r3]-(n4) WHERE r3 <> r1 AND r3 <> r2 WITH DISTINCT n1, n2, n3, n4, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN n1, n2, n3, n4, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_two_edge_path",
+                    "description": "Two-edge intervention path; query extends it by one edge.",
+                    "pattern": "MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2",
+                    "query": "CALL { MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2 } MATCH (n3)-[r3]-(n4) WHERE r3 <> r1 AND r3 <> r2 WITH DISTINCT n1, n2, n3, n4, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN n1, n2, n3, n4, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_one_edge_target_extension",
+                    "description": "Atomic-edge fallback; query extends the target endpoint.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } MATCH (n2)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_one_edge_source_extension",
+                    "description": "Atomic-edge fallback; query extends the source endpoint.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } MATCH (n1)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "balanced_one_edge_target_extension",
+                    "description": "Balanced atomic-edge candidate; balances target-endpoint extensions per intervention unit.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } CALL { WITH n1, n2, r1 MATCH (n2)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r2) LIMIT toInteger(ceil(2.0 * __N__ / __M__)) RETURN n3, r2 } WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": true
+                },
+                {
+                    "name": "balanced_one_edge_source_extension",
+                    "description": "Balanced atomic-edge candidate; balances source-endpoint extensions per intervention unit.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } CALL { WITH n1, n2, r1 MATCH (n1)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r2) LIMIT toInteger(ceil(2.0 * __N__ / __M__)) RETURN n3, r2 } WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": true
+                },
+                {
+                    "name": "balanced_one_edge_two_hop_target_extension",
+                    "description": "Balanced one-edge WWC fallback with a two-hop target-endpoint extension.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } CALL { WITH n1, n2, r1 MATCH (n2)-[r2]-(n3)-[r3]-(n4) WHERE r2 <> r1 AND r3 <> r1 AND r3 <> r2 WITH DISTINCT n1, n2, n3, n4, r1, r2, r3 ORDER BY elementId(r2), elementId(r3) LIMIT toInteger(ceil(2.0 * __N__ / __M__)) RETURN n3, n4, r2, r3 } WITH DISTINCT n1, n2, n3, n4, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN n1, n2, n3, n4, r1, r2, r3",
+                    "rounding_favorable": true
+                }
+            ]
+        },
+        "stackoverflow": {
+            "run_by_default": true,
+            "runtime_quality_edge_match": "MATCH (a:Answer)-[r:ANSWERED]->(b:Question)",
+            "runtime_quality_edge_description": "answer-to-question relationships",
+            "candidates": [
+                {
+                    "name": "answer_question_tag",
+                    "description": "An answer and one of its question's tags, extended by the answer's author.",
+                    "pattern": "MATCH (a:Answer)-[r1:ANSWERED]->(q:Question)-[r2:TAGGED]->(t:Tag) WITH DISTINCT a, q, t, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN a, q, t, r1, r2",
+                    "query": "CALL { MATCH (a:Answer)-[r1:ANSWERED]->(q:Question)-[r2:TAGGED]->(t:Tag) WITH DISTINCT a, q, t, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN a, q, t, r1, r2 } MATCH (u:User)-[r3:PROVIDED]->(a) WITH DISTINCT u, a, q, t, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN u, a, q, t, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "coanswers_to_question",
+                    "description": "Two answers to the same question, extended by a question tag.",
+                    "pattern": "MATCH (a1:Answer)-[r1:ANSWERED]->(q:Question)<-[r2:ANSWERED]-(a2:Answer) WHERE elementId(a1) < elementId(a2) WITH DISTINCT a1, q, a2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN a1, q, a2, r1, r2",
+                    "query": "CALL { MATCH (a1:Answer)-[r1:ANSWERED]->(q:Question)<-[r2:ANSWERED]-(a2:Answer) WHERE elementId(a1) < elementId(a2) WITH DISTINCT a1, q, a2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN a1, q, a2, r1, r2 } MATCH (q)-[r3:TAGGED]->(t:Tag) WITH DISTINCT a1, q, a2, t, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN a1, q, a2, t, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_two_edge_star",
+                    "description": "Two-edge intervention wedge; three-edge query star centered at the shared node.",
+                    "pattern": "MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2",
+                    "query": "CALL { MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2 } MATCH (n2)-[r3]-(n4) WHERE r3 <> r1 AND r3 <> r2 WITH DISTINCT n1, n2, n3, n4, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN n1, n2, n3, n4, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_two_edge_path",
+                    "description": "Two-edge intervention path; query extends it by one edge.",
+                    "pattern": "MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2",
+                    "query": "CALL { MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2 } MATCH (n3)-[r3]-(n4) WHERE r3 <> r1 AND r3 <> r2 WITH DISTINCT n1, n2, n3, n4, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN n1, n2, n3, n4, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_one_edge_target_extension",
+                    "description": "Atomic-edge fallback; query extends the target endpoint.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } MATCH (n2)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_one_edge_source_extension",
+                    "description": "Atomic-edge fallback; query extends the source endpoint.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } MATCH (n1)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "balanced_one_edge_target_extension",
+                    "description": "Balanced atomic-edge candidate; balances target-endpoint extensions per intervention unit.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } CALL { WITH n1, n2, r1 MATCH (n2)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r2) LIMIT toInteger(ceil(2.0 * __N__ / __M__)) RETURN n3, r2 } WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": true
+                },
+                {
+                    "name": "balanced_one_edge_source_extension",
+                    "description": "Balanced atomic-edge candidate; balances source-endpoint extensions per intervention unit.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } CALL { WITH n1, n2, r1 MATCH (n1)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r2) LIMIT toInteger(ceil(2.0 * __N__ / __M__)) RETURN n3, r2 } WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": true
+                }
+            ]
+        },
+        "fincen": {
+            "run_by_default": true,
+            "runtime_quality_edge_match": "MATCH (a:Filing)-[r:ORIGINATOR]->(b:Entity)",
+            "runtime_quality_edge_description": "filing-originator relationships",
+            "candidates": [
+                {
+                    "name": "shared_originator_filings",
+                    "description": "Two filings sharing an originator, extended by the filer of one filing.",
+                    "pattern": "MATCH (f1:Filing)-[r1:ORIGINATOR]->(e:Entity)<-[r2:ORIGINATOR]-(f2:Filing) WHERE elementId(f1) < elementId(f2) WITH DISTINCT f1, e, f2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN f1, e, f2, r1, r2",
+                    "query": "CALL { MATCH (f1:Filing)-[r1:ORIGINATOR]->(e:Entity)<-[r2:ORIGINATOR]-(f2:Filing) WHERE elementId(f1) < elementId(f2) WITH DISTINCT f1, e, f2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN f1, e, f2, r1, r2 } MATCH (filer:Entity)-[r3:FILED]->(f1) WITH DISTINCT filer, f1, e, f2, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN filer, f1, e, f2, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "shared_beneficiary_filings",
+                    "description": "Two filings sharing a beneficiary, extended by the filer of one filing.",
+                    "pattern": "MATCH (f1:Filing)-[r1:BENEFITS]->(e:Entity)<-[r2:BENEFITS]-(f2:Filing) WHERE elementId(f1) < elementId(f2) WITH DISTINCT f1, e, f2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN f1, e, f2, r1, r2",
+                    "query": "CALL { MATCH (f1:Filing)-[r1:BENEFITS]->(e:Entity)<-[r2:BENEFITS]-(f2:Filing) WHERE elementId(f1) < elementId(f2) WITH DISTINCT f1, e, f2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN f1, e, f2, r1, r2 } MATCH (filer:Entity)-[r3:FILED]->(f1) WITH DISTINCT filer, f1, e, f2, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN filer, f1, e, f2, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "filing_originator_beneficiary",
+                    "description": "Originator-beneficiary filing path, extended by the filing entity.",
+                    "pattern": "MATCH (origin:Entity)<-[r1:ORIGINATOR]-(f:Filing)-[r2:BENEFITS]->(beneficiary:Entity) WITH DISTINCT origin, f, beneficiary, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN origin, f, beneficiary, r1, r2",
+                    "query": "CALL { MATCH (origin:Entity)<-[r1:ORIGINATOR]-(f:Filing)-[r2:BENEFITS]->(beneficiary:Entity) WITH DISTINCT origin, f, beneficiary, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN origin, f, beneficiary, r1, r2 } MATCH (filer:Entity)-[r3:FILED]->(f) WITH DISTINCT filer, origin, f, beneficiary, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN filer, origin, f, beneficiary, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_two_edge_star",
+                    "description": "Two-edge intervention wedge; three-edge query star centered at the shared node.",
+                    "pattern": "MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2",
+                    "query": "CALL { MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2 } MATCH (n2)-[r3]-(n4) WHERE r3 <> r1 AND r3 <> r2 WITH DISTINCT n1, n2, n3, n4, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN n1, n2, n3, n4, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_two_edge_path",
+                    "description": "Two-edge intervention path; query extends it by one edge.",
+                    "pattern": "MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2",
+                    "query": "CALL { MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2 } MATCH (n3)-[r3]-(n4) WHERE r3 <> r1 AND r3 <> r2 WITH DISTINCT n1, n2, n3, n4, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN n1, n2, n3, n4, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_one_edge_target_extension",
+                    "description": "Atomic-edge fallback; query extends the target endpoint.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } MATCH (n2)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_one_edge_source_extension",
+                    "description": "Atomic-edge fallback; query extends the source endpoint.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } MATCH (n1)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "balanced_one_edge_target_extension",
+                    "description": "Balanced atomic-edge candidate; balances target-endpoint extensions per intervention unit.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } CALL { WITH n1, n2, r1 MATCH (n2)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r2) LIMIT toInteger(ceil(2.0 * __N__ / __M__)) RETURN n3, r2 } WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": true
+                },
+                {
+                    "name": "balanced_one_edge_source_extension",
+                    "description": "Balanced atomic-edge candidate; balances source-endpoint extensions per intervention unit.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } CALL { WITH n1, n2, r1 MATCH (n1)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r2) LIMIT toInteger(ceil(2.0 * __N__ / __M__)) RETURN n3, r2 } WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": true
+                }
+            ]
+        },
+        "icij-offshoreleaks": {
+            "run_by_default": true,
+            "runtime_quality_edge_match": "MATCH (a:Officer)-[r:officer_of]-(b)",
+            "runtime_quality_edge_description": "officer-to-entity relationships",
+            "candidates": [
+                {
+                    "name": "coofficers_same_entity",
+                    "description": "Two officers connected to one offshore entity, extended by its registered address.",
+                    "pattern": "MATCH (o1:Officer)-[r1:officer_of]-(e)-[r2:officer_of]-(o2:Officer) WHERE elementId(o1) < elementId(o2) WITH DISTINCT o1, e, o2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN o1, e, o2, r1, r2",
+                    "query": "CALL { MATCH (o1:Officer)-[r1:officer_of]-(e)-[r2:officer_of]-(o2:Officer) WHERE elementId(o1) < elementId(o2) WITH DISTINCT o1, e, o2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN o1, e, o2, r1, r2 } MATCH (e)-[r3:registered_address]-(a) WITH DISTINCT o1, e, o2, a, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN o1, e, o2, a, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "officer_entity_address",
+                    "description": "Officer-entity-address intervention extended by another officer of the entity.",
+                    "pattern": "MATCH (o:Officer)-[r1:officer_of]-(e)-[r2:registered_address]-(a) WITH DISTINCT o, e, a, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN o, e, a, r1, r2",
+                    "query": "CALL { MATCH (o:Officer)-[r1:officer_of]-(e)-[r2:registered_address]-(a) WITH DISTINCT o, e, a, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN o, e, a, r1, r2 } MATCH (o2:Officer)-[r3:officer_of]-(e) WHERE o2 <> o WITH DISTINCT o, e, a, o2, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN o, e, a, o2, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_one_edge_target_extension",
+                    "description": "Atomic-edge fallback; query extends the target endpoint.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } MATCH (n2)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_one_edge_source_extension",
+                    "description": "Atomic-edge fallback; query extends the source endpoint.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } MATCH (n1)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_two_edge_star",
+                    "description": "Two-edge intervention wedge; three-edge query star centered at the shared node.",
+                    "pattern": "MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2",
+                    "query": "CALL { MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2 } MATCH (n2)-[r3]-(n4) WHERE r3 <> r1 AND r3 <> r2 WITH DISTINCT n1, n2, n3, n4, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN n1, n2, n3, n4, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_two_edge_path",
+                    "description": "Two-edge intervention path; query extends it by one edge.",
+                    "pattern": "MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2",
+                    "query": "CALL { MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2 } MATCH (n3)-[r3]-(n4) WHERE r3 <> r1 AND r3 <> r2 WITH DISTINCT n1, n2, n3, n4, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN n1, n2, n3, n4, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "balanced_one_edge_target_extension",
+                    "description": "Balanced atomic-edge candidate; balances target-endpoint extensions per intervention unit.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } CALL { WITH n1, n2, r1 MATCH (n2)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r2) LIMIT toInteger(ceil(2.0 * __N__ / __M__)) RETURN n3, r2 } WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": true
+                },
+                {
+                    "name": "balanced_one_edge_source_extension",
+                    "description": "Balanced atomic-edge candidate; balances source-endpoint extensions per intervention unit.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } CALL { WITH n1, n2, r1 MATCH (n1)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r2) LIMIT toInteger(ceil(2.0 * __N__ / __M__)) RETURN n3, r2 } WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": true
+                }
+            ]
+        },
+        "star-wars": {
+            "run_by_default": true,
+            "runtime_quality_edge_match": "MATCH (a:Character)-[r:APPEARED_IN]->(b:Film)",
+            "runtime_quality_edge_description": "character-to-film appearance relationships",
+            "candidates": [
+                {
+                    "name": "character_film_coappearance",
+                    "description": "Character coappearance intervention extended by another film appearance.",
+                    "pattern": "MATCH (c1:Character)-[r1:APPEARED_IN]->(f:Film)<-[r2:APPEARED_IN]-(c2:Character) WHERE elementId(c1) < elementId(c2) WITH DISTINCT c1, f, c2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN c1, f, c2, r1, r2",
+                    "query": "CALL { MATCH (c1:Character)-[r1:APPEARED_IN]->(f:Film)<-[r2:APPEARED_IN]-(c2:Character) WHERE elementId(c1) < elementId(c2) WITH DISTINCT c1, f, c2, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN c1, f, c2, r1, r2 } MATCH (c2)-[r3:APPEARED_IN]->(f2:Film) WHERE f2 <> f WITH DISTINCT c1, f, c2, f2, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN c1, f, c2, f2, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_two_edge_star",
+                    "description": "Two-edge intervention wedge; three-edge query star centered at the shared node.",
+                    "pattern": "MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2",
+                    "query": "CALL { MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2 } MATCH (n2)-[r3]-(n4) WHERE r3 <> r1 AND r3 <> r2 WITH DISTINCT n1, n2, n3, n4, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN n1, n2, n3, n4, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_two_edge_path",
+                    "description": "Two-edge intervention path; query extends it by one edge.",
+                    "pattern": "MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2",
+                    "query": "CALL { MATCH (n1)-[r1]-(n2)-[r2]-(n3) WHERE elementId(r1) < elementId(r2) WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __M__ RETURN n1, n2, n3, r1, r2 } MATCH (n3)-[r3]-(n4) WHERE r3 <> r1 AND r3 <> r2 WITH DISTINCT n1, n2, n3, n4, r1, r2, r3 ORDER BY elementId(r1), elementId(r2), elementId(r3) LIMIT __N__ RETURN n1, n2, n3, n4, r1, r2, r3",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_one_edge_target_extension",
+                    "description": "Atomic-edge fallback; query extends the target endpoint.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } MATCH (n2)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "generic_one_edge_source_extension",
+                    "description": "Atomic-edge fallback; query extends the source endpoint.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } MATCH (n1)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": false
+                },
+                {
+                    "name": "balanced_one_edge_target_extension",
+                    "description": "Balanced atomic-edge candidate; balances target-endpoint extensions per intervention unit.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } CALL { WITH n1, n2, r1 MATCH (n2)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r2) LIMIT toInteger(ceil(2.0 * __N__ / __M__)) RETURN n3, r2 } WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": true
+                },
+                {
+                    "name": "balanced_one_edge_source_extension",
+                    "description": "Balanced atomic-edge candidate; balances source-endpoint extensions per intervention unit.",
+                    "pattern": "MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1",
+                    "query": "CALL { MATCH (n1)-[r1]->(n2) WITH n1, n2, r1 ORDER BY elementId(r1) LIMIT __M__ RETURN n1, n2, r1 } CALL { WITH n1, n2, r1 MATCH (n1)-[r2]-(n3) WHERE r2 <> r1 WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r2) LIMIT toInteger(ceil(2.0 * __N__ / __M__)) RETURN n3, r2 } WITH DISTINCT n1, n2, n3, r1, r2 ORDER BY elementId(r1), elementId(r2) LIMIT __N__ RETURN n1, n2, n3, r1, r2",
+                    "rounding_favorable": true
+                }
+            ]
+        }
+    }
+}

@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Experiment outputs (can be large and contain local Neo4j element IDs)
+rsp_*results*/
+rsp_*preflight*/
+rsp_experiment_results/
+run_logs/
+resolved_queries/
+algorithm_logs/
+results.jsonl
+preflight.jsonl
+preflight.csv
+summary.csv
+aggregate_results.csv
+timeouts.csv
+*.log
+
+# Neo4j runtime/data should never be committed
+neo4j-instances/
+data/
+logs/
+plugins/
+certificates/
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+*~
